@@ -41,11 +41,29 @@ def create_hugging_face_model(model_name: str):
     if model_name in MODEL_CACHE:
         return MODEL_CACHE[model_name]
 
+    # Detect available device: CUDA > MPS (Apple) > CPU
+    mps_available = getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available() and torch.backends.mps.is_built()
+    cuda_available = torch.cuda.is_available()
+
+    # Choose dtype: prefer fp16 on CUDA, otherwise fp32 (MPS doesn't fully support fp16 for many ops)
+    torch_dtype = torch.float16 if cuda_available else torch.float32
+
+    # Choose pipeline device: prefer CUDA index, then 'mps' string (transformers may accept it), else 'cpu'
+    if cuda_available:
+        device_arg = 0
+    elif mps_available:
+        # Newer transformers versions accept device='mps' or torch.device('mps') for pipelines
+        device_arg = "mps"
+    else:
+        device_arg = "cpu"
+
+    # Create pipeline directly on the chosen device. This avoids having to manually move
+    # the internal model tensors later which can produce device-mismatch errors.
     asr = pipeline(
         task="automatic-speech-recognition",
         model=model_name,
-        torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-        device=0 if torch.cuda.is_available() else "cpu",
+        torch_dtype=torch_dtype,
+        device=device_arg,
     )
 
     MODEL_CACHE[model_name] = asr
@@ -190,6 +208,31 @@ def main():
                     out2 = model(audio_np, sampling_rate=sr)
                     return out2["text"] if isinstance(out2, dict) else out2[0]["text"]
                 except Exception as e2:
+                    # If torchaudio failed due to missing TorchCodec backend, try soundfile/librosa
+                    err_msg = str(e2)
+                    if "TorchCodec is required" in err_msg or "torchcodec" in err_msg:
+                        try:
+                            import soundfile as sf
+                            import numpy as _np
+
+                            audio_np, sr = sf.read(str(wav_path))
+                            # soundfile returns (samples, channels) for multi-channel
+                            if audio_np.ndim > 1:
+                                audio_np = audio_np.mean(axis=1)
+                            if sr != 16000:
+                                import librosa
+
+                                audio_np = librosa.resample(audio_np, orig_sr=sr, target_sr=16000)
+                                sr = 16000
+                            out3 = model(audio_np, sampling_rate=sr)
+                            return out3["text"] if isinstance(out3, dict) else out3[0]["text"]
+                        except Exception as e3:
+                            hint = (
+                                "\nHint: torchaudio reported a TorchCodec requirement. You can install torchcodec\n"
+                                "(pip install torchcodec) or install soundfile and librosa (pip install soundfile librosa)\n"
+                                "to enable the fallback loader."
+                            )
+                            return f"ERROR: primary error: {e}; fallback error: {e2}; secondary fallback error: {e3}.{hint}"
                     return f"ERROR: primary error: {e}; fallback error: {e2}"
         start = time.time()
         ind_text = _transcribe_with_fallback(ind_model, wav)
