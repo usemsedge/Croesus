@@ -1,28 +1,60 @@
+
+import torch
 import torchaudio
+from transformers import Wav2Vec2Processor, Wav2Vec2ForSequenceClassification, pipeline, AutoProcessor, AutoModelForAudioClassification
+import requests
 import os
-from speechbrain.pretrained import EncoderClassifier
+
+ACCENT_PREDICTION_MODEL_ID = "Jzuluaga/accent-id-commonaccent_xlsr-en-english"
 
 
-def get_accent_prediction(input_wav_file_path: str) -> tuple:
-  '''
-  Given a .wav file path, return the accent prediction using a pretrained accent classifier.
-  '''
-  # Load pretrained accent classifier
-  classifier = EncoderClassifier.from_hparams(
-      source="speechbrain/accent-identifier",
-      savedir="pretrained_models/accent-identifier"
-  )
+def get_accent_prediction(input_wav_file_path: str, model_id: str = ACCENT_PREDICTION_MODEL_ID) -> dict:
+  """
+  Given a .wav path, return accent prediction using either a Transformers audio-classification
+  model or (for SpeechBrain-packaged models like the Jzuluaga CommonAccent) fall back to
+  SpeechBrain's `foreign_class` interface.
 
-  # Load audio (.wav)
-  signal, fs = torchaudio.load(input_wav_file_path)  # signal shape: [channels, samples]
+  Returns a dict with either {"accent": label, "confidence": float} or {"error": msg}.
+  """
+  # First try Transformers audio-classification pipeline / processor
+  try:
+    # Try Processor + Model path (works for Transformers-compatible repos)
+    processor = AutoProcessor.from_pretrained(model_id)
+    model = AutoModelForAudioClassification.from_pretrained(model_id)
 
-  # Optional: convert to mono
-  if signal.shape[0] > 1:
-      signal = signal.mean(dim=0, keepdim=True)
+    # Load audio
+    speech_array, sampling_rate = torchaudio.load(input_wav_file_path)
+    if speech_array.shape[0] > 1:
+      speech_array = speech_array.mean(dim=0)
+    speech_array = speech_array.squeeze().numpy()
 
-  # Run accent classification
-  prediction = classifier.classify_file(input_wav_file_path)
-  return prediction
+    if sampling_rate != 16000:
+      resampler = torchaudio.transforms.Resample(orig_freq=sampling_rate, new_freq=16000)
+      speech_array = resampler(torch.tensor(speech_array)).numpy()
+
+    inputs = processor(speech_array, sampling_rate=16000, return_tensors="pt", padding=True)
+    with torch.no_grad():
+      logits = model(**inputs).logits
+    predicted_class_id = int(logits.argmax(dim=-1))
+    label = model.config.id2label.get(predicted_class_id, str(predicted_class_id))
+    confidence = float(torch.softmax(logits, dim=-1)[0][predicted_class_id])
+    return {"accent": label, "confidence": confidence}
+  except Exception as e:
+    tf_err = str(e)
+
+  # If transformers path failed, try SpeechBrain foreign_class for models packaged that way
+  try:
+    from speechbrain.pretrained.interfaces import foreign_class
+
+    classifier = foreign_class(
+      source=model_id,
+      pymodule_file="custom_interface.py",
+      classname="CustomEncoderWav2vec2Classifier",
+    )
+    out_prob, score, index, text_lab = classifier.classify_file(input_wav_file_path)
+    return {"accent": text_lab, "confidence": float(score)}
+  except Exception as sb_e:
+    return {"error": f"Transformers error: {tf_err}; SpeechBrain error: {sb_e}"}
 
 def get_text_from_speech(input_wav_file_path: str, attributes: dict) -> str:
   '''
@@ -34,9 +66,15 @@ def get_text_from_speech(input_wav_file_path: str, attributes: dict) -> str:
   gender = attributes["gender"]
   accent = attributes["accent"]
 
+  # lazy import SpeechBrain EncoderClassifier to avoid requiring speechbrain at module import
+  try:
+    from speechbrain.pretrained import EncoderClassifier
+  except Exception as e:
+    raise RuntimeError("speechbrain is required for get_text_from_speech: " + str(e))
+
   asr_model = EncoderClassifier.from_hparams(
-      source="speechbrain/asr-transformer-transformerlm-librispeech",
-      savedir="pretrained_models/asr-transformer-transformerlm-librispeech"
+    source="speechbrain/asr-transformer-transformerlm-librispeech",
+    savedir="pretrained_models/asr-transformer-transformerlm-librispeech"
   )
 
   # Transcribe audio

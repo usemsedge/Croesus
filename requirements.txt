@@ -1,0 +1,4 @@
+# Requirements for Croesus accent classification
+transformers>=4.0.0
+torch>=1.7.0
+torchaudio>=0.7.0
