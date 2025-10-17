@@ -11,9 +11,10 @@ def return_response(input_wav_file_path: str, output_wav_file_path: str) -> dict
   if os.path.exists(input_wav_file_path) == False:
     print("File does not exist")
     return {"status": "error", "message": "File does not exist"}
-  if os.path.exists(output_wav_file_path):
-    print("Output file already exists")
-    return {"status": "error", "message": "Output file already exists"}
+  
+  #if os.path.exists(output_wav_file_path):
+  #  print("Output file already exists")
+  #  return {"status": "error", "message": "Output file already exists"}
 
   # STEP 1: Get prediction form pretrained accent classifier
   prediction = audio.get_accent_prediction(input_wav_file_path)
@@ -29,15 +30,19 @@ def return_response(input_wav_file_path: str, output_wav_file_path: str) -> dict
   print("------------ LLM Response -----------")
   print(response)
   print("------------ End LLM Response ----------------")
-
+  print("------------ Accent Prediction -----------")
+  print(prediction)
+  print("------------ End Accent Prediction ----------------")
   # STEP 4: Convert LLM text to speech
   audio.text_to_speech(response, prediction, output_wav_file_path)
+
 
   return {
     "status": "success", 
     "file_path": output_wav_file_path, 
     "prediction": prediction
   }
+
 
 if __name__ == "__main__":
   input_wav_file_path = "./samples/ASI/wav/arctic_a0003.wav"

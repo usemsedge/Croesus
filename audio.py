@@ -1,15 +1,14 @@
 
 from pyexpat import model
-import torch
-import torchaudio
+import pyttsx3
 from transformers import AutoModelForAudioClassification, WhisperFeatureExtractor
-import requests
 import os
-import librosa
+import time
 from specialized_models import create_model, transcribe_with_fallback, \
   SPECIALIZED_MODELS
 import google.generativeai as genai
 from dotenv import load_dotenv
+import pyttsx3
 
 from specialized_accent_classifier import predict_audio
 
@@ -43,10 +42,10 @@ def get_text_from_speech(input_wav_file_path: str, attributes: dict) -> str:
 
   model = MODEL_CACHE.get(accent)
   if model is None:
-    model_source = SPECIALIZED_MODELS.get(accent).get("hf_id")
+    model_source = SPECIALIZED_MODELS.get(accent)
     if model_source is None:
-      model_source = SPECIALIZED_MODELS.get("general").get("hf_id")
-    model = create_model(model_source, model_type="hf")
+      model_source = SPECIALIZED_MODELS.get("general")
+    model = create_model(model_source['hf_id'], model_type="hf")
     MODEL_CACHE[accent] = model
 
   text = transcribe_with_fallback(model, input_wav_file_path)
@@ -74,8 +73,10 @@ def get_llm_response(text: str, attributes: dict) -> str:
   comes from a phone call from a person with the 
   following attributes: {attributes}. 
 
-  The text is part of a story. Add between 30 and 50 words
-  to the story.
+  If the text is phrased like a question, 
+  answer the question in 30-50 words. If the question
+  concerns things you don't know, say you don't know.
+  Example: Where is my package I ordered yesterday? I don't know.
 
   Text: {text}
   """
@@ -87,8 +88,11 @@ def text_to_speech(text: str, attributes: dict, output_wav_file_path: str) -> No
   Given text and a dictionary of attributes, 
   convert the text to speech and save it as a .wav file.
   '''
+
   # This is a placeholder function. In practice, you would use a TTS library or API.
-  
-  # Example: Using a hypothetical TTS library
-  # tts = SomeTTSLibrary(voice=attributes["accent"],
-  raise NotImplementedError("TTS functionality is not implemented yet.")
+  # Attributes can be used to customize the voice, accent, etc.
+  ''''''
+  ENGINE = pyttsx3.init()
+  ENGINE.say(text)
+  ENGINE.runAndWait()
+  ENGINE.stop()

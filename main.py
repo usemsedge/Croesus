@@ -1,9 +1,6 @@
-
-
-from audio import get_accent_prediction, get_text_from_speech, \
-  get_response_from_LLM, text_to_speech
+from return_response import return_response
+from helpers import record_audio, play_audio
 
 if __name__ == "__main__":
-    
-    audio_file_path = "./samples/ASI/wav/arctic_a0001.wav"
-    print("Hello, World!")
+    record_audio("input.wav", 5)
+    result = return_response("input.wav", "output.wav")

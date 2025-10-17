@@ -2,7 +2,8 @@
 
 
 from pathlib import Path
-
+import sounddevice as sd
+from scipy.io.wavfile import write, read
 
 def read_transcript(wav_path: Path):
     # Try several locations for transcripts:
@@ -79,3 +80,26 @@ def cer(ref: str, hyp: str) -> float:
     if len(r) == 0:
         return float(len(h))
     return float(d[len(r)][len(h)]) / float(len(r))
+
+
+def record_audio(file_path: str, time_seconds: int):
+    # Settings
+    duration = time_seconds  # seconds
+    sample_rate = 16000  # 16 kHz, good for speech
+
+    print(f"🎤 Recording for {duration} seconds...")
+    audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype='int16')
+    sd.wait()  # wait until recording is done
+    print("✅ Done!")
+
+    # Save to a WAV file
+    write(file_path, sample_rate, audio)
+
+def play_audio(file_path: str):
+
+    # Load and play
+    sample_rate, data = read(file_path)
+    print("🎧 Playing...")
+    sd.play(data, sample_rate)
+    sd.wait()  # Wait until playback finishes
+    print("✅ Done!")
