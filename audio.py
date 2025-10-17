@@ -1,14 +1,19 @@
 
+from pyexpat import model
 import torch
 import torchaudio
-from transformers import Wav2Vec2Processor, Wav2Vec2ForSequenceClassification, pipeline, AutoProcessor, AutoModelForAudioClassification
+from transformers import AutoModelForAudioClassification, WhisperFeatureExtractor
 import requests
 import os
+import librosa
+from specialized_models import create_model, transcribe_with_fallback, \
+  SPECIALIZED_MODELS
 
-ACCENT_PREDICTION_MODEL_ID = "Jzuluaga/accent-id-commonaccent_xlsr-en-english"
 
+ACCENT_PREDICTION_MODEL_ID = "nirmoh/accent-whisper"
+MODEL_CACHE = {}
 
-def get_accent_prediction(input_wav_file_path: str, model_id: str = ACCENT_PREDICTION_MODEL_ID) -> dict:
+def get_accent_prediction(input_wav_file_path: str, model_id: str = ACCENT_PREDICTION_MODEL_ID):
   """
   Given a .wav path, return accent prediction using either a Transformers audio-classification
   model or (for SpeechBrain-packaged models like the Jzuluaga CommonAccent) fall back to
@@ -16,45 +21,28 @@ def get_accent_prediction(input_wav_file_path: str, model_id: str = ACCENT_PREDI
 
   Returns a dict with either {"accent": label, "confidence": float} or {"error": msg}.
   """
-  # First try Transformers audio-classification pipeline / processor
-  try:
-    # Try Processor + Model path (works for Transformers-compatible repos)
-    processor = AutoProcessor.from_pretrained(model_id)
-    model = AutoModelForAudioClassification.from_pretrained(model_id)
 
-    # Load audio
-    speech_array, sampling_rate = torchaudio.load(input_wav_file_path)
-    if speech_array.shape[0] > 1:
-      speech_array = speech_array.mean(dim=0)
-    speech_array = speech_array.squeeze().numpy()
+  feature_extractor = WhisperFeatureExtractor.from_pretrained("nirmoh/accent-whisper")
 
-    if sampling_rate != 16000:
-      resampler = torchaudio.transforms.Resample(orig_freq=sampling_rate, new_freq=16000)
-      speech_array = resampler(torch.tensor(speech_array)).numpy()
+  waveform, sr = torchaudio.load(str(input_wav_file_path))
+  if waveform.shape[0] > 1:
+      waveform = waveform.mean(dim=0)
+  audio_np = waveform.squeeze().numpy()
+  if sr != 16000:
+    resampler = torchaudio.transforms.Resample(orig_freq=sr, new_freq=16000)
+    audio_np = resampler(torch.tensor(audio_np)).numpy()
+    sr = 16000
 
-    inputs = processor(speech_array, sampling_rate=16000, return_tensors="pt", padding=True)
-    with torch.no_grad():
+  inputs = feature_extractor(audio_np, sampling_rate=sr, return_tensors="pt")
+  model = AutoModelForAudioClassification.from_pretrained("nirmoh/accent-whisper")
+  with torch.no_grad():
       logits = model(**inputs).logits
-    predicted_class_id = int(logits.argmax(dim=-1))
-    label = model.config.id2label.get(predicted_class_id, str(predicted_class_id))
-    confidence = float(torch.softmax(logits, dim=-1)[0][predicted_class_id])
-    return {"accent": label, "confidence": confidence}
-  except Exception as e:
-    tf_err = str(e)
+  predicted_class = logits.argmax(dim=-1)
+
+  return predicted_class
 
   # If transformers path failed, try SpeechBrain foreign_class for models packaged that way
-  try:
-    from speechbrain.pretrained.interfaces import foreign_class
 
-    classifier = foreign_class(
-      source=model_id,
-      pymodule_file="custom_interface.py",
-      classname="CustomEncoderWav2vec2Classifier",
-    )
-    out_prob, score, index, text_lab = classifier.classify_file(input_wav_file_path)
-    return {"accent": text_lab, "confidence": float(score)}
-  except Exception as sb_e:
-    return {"error": f"Transformers error: {tf_err}; SpeechBrain error: {sb_e}"}
 
 def get_text_from_speech(input_wav_file_path: str, attributes: dict) -> str:
   '''
@@ -63,23 +51,20 @@ def get_text_from_speech(input_wav_file_path: str, attributes: dict) -> str:
   '''
   # Load pretrained ASR model
   # These may be changed based off available specialized models
-  gender = attributes["gender"]
-  accent = attributes["accent"]
+  gender = attributes.get("gender", None)
+  accent = attributes.get("accent", None)
 
-  # lazy import SpeechBrain EncoderClassifier to avoid requiring speechbrain at module import
-  try:
-    from speechbrain.pretrained import EncoderClassifier
-  except Exception as e:
-    raise RuntimeError("speechbrain is required for get_text_from_speech: " + str(e))
+  model = MODEL_CACHE.get(accent)
+  if model is None:
+    model_source = SPECIALIZED_MODELS.get(accent).get("hf_id")
+    if model_source is None:
+      model_source = SPECIALIZED_MODELS.get("general").get("hf_id")
+    model = create_model(model_source, model_type="hf")
+    MODEL_CACHE[accent] = model
 
-  asr_model = EncoderClassifier.from_hparams(
-    source="speechbrain/asr-transformer-transformerlm-librispeech",
-    savedir="pretrained_models/asr-transformer-transformerlm-librispeech"
-  )
+  text = transcribe_with_fallback(model, input_wav_file_path)
 
-  # Transcribe audio
-  transcription = asr_model.transcribe_file(input_wav_file_path)
-  return transcription
+  return text
 
 def get_response_from_LLM(text: str, attributes: dict) -> str:
   '''
@@ -94,7 +79,7 @@ def get_response_from_LLM(text: str, attributes: dict) -> str:
   
   # Call to LLM API would go here
   response = "This is a placeholder response from the LLM."
-  
+  raise NotImplementedError("LLM functionality is not implemented yet.")
   return response
 
 def text_to_speech(text: str, attributes: dict, output_wav_file_path: str) -> None:
@@ -106,3 +91,4 @@ def text_to_speech(text: str, attributes: dict, output_wav_file_path: str) -> No
   
   # Example: Using a hypothetical TTS library
   # tts = SomeTTSLibrary(voice=attributes["accent"],
+  raise NotImplementedError("TTS functionality is not implemented yet.")
