@@ -49,6 +49,10 @@ def main():
     cer_proportional_diffs = []
     wer_absolute_diffs = []
     cer_absolute_diffs = []
+    general_wers = []
+    general_cers = []
+    indian_wers = []
+    indian_cers = []
     for wav in wavs:
         print("---")
         print(f"Sample: {wav}")
@@ -91,6 +95,10 @@ def main():
             w_gen = _wer(transcript.lower(), gen_text.lower())
             c_ind = _cer(transcript.lower(), ind_text.lower())
             c_gen = _cer(transcript.lower(), gen_text.lower())'''
+            general_wers.append(w_gen)
+            general_cers.append(c_gen)
+            indian_wers.append(w_ind)
+            indian_cers.append(c_ind)
 
             print(f"WER Indian: {w_ind:.3f}, General: {w_gen:.3f}")
             print(f"CER Indian: {c_ind:.3f}, General: {c_gen:.3f}")
@@ -123,5 +131,35 @@ def main():
               f"{sum(wer_absolute_diffs)/len(wer_absolute_diffs):.3f}")
         print(f"Avg absolute CER diff (gen - ind) over {len(cer_absolute_diffs)} samples: "
               f"{sum(cer_absolute_diffs)/len(cer_absolute_diffs):.3f}")
+        with open('./indian_cers.txt', 'w+') as f:
+          f.write(str(indian_cers))
+        with open('./general_cers.txt', 'w+') as f:
+          f.write(str(general_cers)) 
+        import matplotlib.pyplot as plt
+        import random
+
+        # Generate data
+        x = list(range(100))  # x-axis values: 0 to 99
+
+        # Create plot
+        plt.figure(figsize=(8, 5))
+        plt.scatter(x, general_cers, color='blue', label='General Model')
+        plt.scatter(x, indian_cers, color='red', label='Indian Accent Model')
+
+        # Axis labels and limits
+        plt.xlabel('trial')
+        plt.ylabel('cer')
+        plt.xlim(0, 100)
+        plt.ylim(0, 1)
+
+        # Optional: Add legend and grid
+        plt.legend()
+        plt.grid(True, linestyle='--', alpha=0.5)
+
+        # Save to PNG file
+        plt.savefig('./cer_trials.png', dpi=300, bbox_inches='tight')
+
+
+
 if __name__ == "__main__":
     main()

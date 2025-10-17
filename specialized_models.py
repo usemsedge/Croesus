@@ -40,7 +40,6 @@ def create_model(model_source: str, model_type: str = "hf"):
         raise ValueError(f"Unsupported model type: {model_type}")
 
 def create_hugging_face_model(model_name: str):
-    print("model name; ", model_name)
     """Create and cache a Hugging Face ASR model pipeline."""
     # Detect available device: CUDA > MPS (Apple) > CPU
     mps_available = getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available() and torch.backends.mps.is_built()

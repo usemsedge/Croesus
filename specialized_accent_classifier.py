@@ -69,7 +69,6 @@ model = WhisperClassifier()
 path = "/Users/owenfei/.cache/huggingface/hub/models--nirmoh--accent-whisper/snapshots/70e4d1085f48e6ccdc8efa0b1c03864133cfa212/accent_classifier.safetensors"
 state = load_file(path, device="cpu")   # or device="mps"/"cuda"
 # inspect keys if you want:
-print(list(state.keys())[:40])
 
 model.load_state_dict(state, strict=False)
 model.to(device)
