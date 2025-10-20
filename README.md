@@ -12,11 +12,9 @@ Solutions:
 - Detect why confidence is low (accent vs noise vs uncertainty) and specialize on that/alert the user.
 - Be more transparent to the user - provide some visualization on what the AI is doing.
 
+Croesus will help out voice recognition AIs on phone/online calls with clients.
 
-Croesus will help out voice recognition AIs on phone calls with clients.
-
-
-Features:
+# Core functionality
 - Input: .wav file
 - Model Layer 1: gets input accent, redirects to Layer 2 if confident enough
 - Model Layer 2: accent-specific model which parses the voice
@@ -24,32 +22,21 @@ Features:
 - Layer 4: TTS for the LLM response
 - Output: .wav file
 
+# Web app API (TODO during interview)
+- POST /api/session: Create a new session. Returns a session ID. This ID must be remembered by the client.
+- POST /api/audio/process: Provide audio to the server - server returns a response. Requires a valid session id.
+
+# General file structure:
+audio.py: One function for each of the four layers.
+specialized_accent_classifier: Function to get accent (or other attributes) from speech.
+specialized_models.py: Functions to use a specific model to get text from speech.
+helpers.py: Assorted helper functions.
+
+return_response.py: Example file which accepts input and output audio file.
 
 # one-off run (from repo root)
 DYLD_LIBRARY_PATH="/opt/homebrew/opt/ffmpeg@7/lib:/opt/homebrew/lib:$(pwd)/.venv/lib/python3.12/site-packages/torch/lib" python specialized_models.py
 
-## Getting started (quick)
+# activate venv
+source .venv/bin/activate
 
-1. Clone or pull the repo.
-2. Run the setup script to create a virtualenv and install dependencies:
-
-```bash
-./setup.sh
-```
-
-3. Run using the wrapper (recommended) which activates the venv and exposes FFmpeg@7 libs to torchcodec:
-
-```bash
-./run_specialized.sh
-```
-
-4. One-off without the wrapper (explicit DYLD):
-
-```bash
-DYLD_LIBRARY_PATH="/opt/homebrew/opt/ffmpeg@7/lib:/opt/homebrew/lib:$(pwd)/.venv/lib/python3.12/site-packages/torch/lib" python specialized_models.py
-```
-
-Notes:
-- If you prefer not to use torchcodec/native decoding, install the Python fallbacks instead:
-	`pip install soundfile librosa numpy` (the project uses these when torchcodec is unavailable).
-- If you run into lib load errors, try the one-off DYLD command above or use the wrapper script.

@@ -2,3 +2,6 @@
 transformers>=4.0.0
 torch>=1.7.0
 torchaudio>=0.7.0
+
+# Web framework
+flask>=3.0.0

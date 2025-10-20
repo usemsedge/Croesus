@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Croesus - Voice Chat</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="chat-header">
+            <h1>Voice Chat Assistant</h1>
+            <div class="session-info">
+                Session: <span id="session-id">Loading...</span>
+            </div>
+        </div>
+
+        <div class="chat-window" id="chat-window">
+            <!-- Messages will be added here dynamically -->
+        </div>
+
+        <div class="chat-controls">
+            <button id="record-btn" class="record-button">
+                <span class="record-icon">🎤</span>
+                <span class="record-text">Hold to Record</span>
+            </button>
+            <div class="recording-status" id="recording-status"></div>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // Initialize session on page load
+        async function initSession() {
+            // Check if session exists in localStorage
+            const storedSessionId = localStorage.getItem('croesus_session_id');
+            
+            if (storedSessionId) {
+                sessionId = parseInt(storedSessionId);
+                document.getElementById('session-id').textContent = sessionId;
+                console.log('Using existing session:', sessionId);
+            } else {
+                // Create new session
+                try {
+                    const response = await fetch('/api/session', {
+                        method: 'POST'
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        sessionId = data.session_id;
+                        localStorage.setItem('croesus_session_id', sessionId);
+                        document.getElementById('session-id').textContent = sessionId;
+                        console.log('Created new session:', sessionId);
+                    } else {
+                        console.error('Failed to create session');
+                        document.getElementById('session-id').textContent = 'Error';
+                    }
+                } catch (error) {
+                    console.error('Error creating session:', error);
+                    document.getElementById('session-id').textContent = 'Error';
+                }
+            }
+        }
+
+        // Add message to chat window
+        function addMessage(text, sender) {
+            const chatWindow = document.getElementById('chat-window');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.textContent = text;
+            
+            const timestamp = document.createElement('div');
+            timestamp.className = 'message-time';
+            timestamp.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            bubble.appendChild(timestamp);
+            messageDiv.appendChild(bubble);
+            chatWindow.appendChild(messageDiv);
+            
+            // Auto-scroll to bottom
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        // Add loading indicator
+        function addLoadingMessage() {
+            const chatWindow = document.getElementById('chat-window');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ai-message';
+            messageDiv.id = 'loading-message';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble loading';
+            bubble.innerHTML = '<span class="loading-dots">•••</span>';
+            
+            messageDiv.appendChild(bubble);
+            chatWindow.appendChild(messageDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function removeLoadingMessage() {
+            const loadingMsg = document.getElementById('loading-message');
+            if (loadingMsg) {
+                loadingMsg.remove();
+            }
+        }
+
+        // Setup audio recording
+        async function setupRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioChunks = [];
+                    
+                    // Send audio to server
+                    await sendAudio(audioBlob);
+                };
+                
+                return true;
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                alert('Could not access microphone. Please grant permission.');
+                return false;
+            }
+        }
+
+        // Send audio to server
+        async function sendAudio(audioBlob) {
+            if (!sessionId) {
+                alert('Session not initialized. Please refresh the page.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+            formData.append('session_id', sessionId);
+
+            addLoadingMessage();
+
+            try {
+                const response = await fetch('/api/audio/process', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                removeLoadingMessage();
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Add user's transcribed message
+                    addMessage(data.transcribed_text, 'user');
+                    
+                    // Add AI response
+                    addMessage(data.ai_response, 'ai');
+                } else {
+                    const error = await response.json();
+                    addMessage('Error: ' + (error.error || 'Failed to process audio'), 'ai');
+                }
+            } catch (error) {
+                removeLoadingMessage();
+                console.error('Error sending audio:', error);
+                addMessage('Error: Could not connect to server', 'ai');
+            }
+        }
+
+        // Record button handler
+        const recordBtn = document.getElementById('record-btn');
+        const recordStatus = document.getElementById('recording-status');
+
+        recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                // Start recording
+                if (!mediaRecorder) {
+                    const success = await setupRecording();
+                    if (!success) return;
+                }
+                
+                audioChunks = [];
+                mediaRecorder.start();
+                isRecording = true;
+                
+                recordBtn.classList.add('recording');
+                recordBtn.querySelector('.record-text').textContent = 'Recording... (Click to Stop)';
+                recordStatus.textContent = '🔴 Recording';
+            } else {
+                // Stop recording
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                recordBtn.classList.remove('recording');
+                recordBtn.querySelector('.record-text').textContent = 'Hold to Record';
+                recordStatus.textContent = '';
+            }
+        });
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            initSession();
+            
+            // Add welcome message
+            setTimeout(() => {
+                addMessage('Welcome! Click the button below to start recording your message.', 'ai');
+            }, 500);
+        });
+    </script>
+</body>
+</html>
