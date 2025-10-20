@@ -1,7 +1,38 @@
-# Requirements for Croesus accent classification
-transformers>=4.0.0
-torch>=1.7.0
-torchaudio>=0.7.0
+# Core ML/AI packages
+transformers>=4.57.0
+torch>=2.9.0
+torchaudio>=2.9.0
+torchcodec>=0.8.0
+
+# Audio processing
+librosa>=0.11.0
+soundfile>=0.13.0
+pyttsx3>=2.99
+piper-tts>=1.3.0
+onnxruntime>=1.23.0
+
+# Google Gemini LLM
+google-generativeai>=0.8.5
+google-api-python-client>=2.184.0
+
+# Data handling
+datasets>=4.2.0
+numpy>=2.3.0
+pandas>=2.3.0
+scipy>=1.16.0
+scikit-learn>=1.7.0
 
 # Web framework
-flask>=3.0.0
+flask>=3.1.0
+
+# Utilities
+python-dotenv>=1.1.0
+requests>=2.32.0
+huggingface-hub>=0.35.0
+safetensors>=0.6.0
+tqdm>=4.67.0
+
+# Development (optional - uncomment if needed for dev work)
+# matplotlib>=3.10.0
+# jupyter
+# pytest

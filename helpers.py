@@ -6,6 +6,11 @@ import sounddevice as sd
 from scipy.io.wavfile import write, read
 
 def read_transcript(wav_path: Path):
+    '''
+    Read the transcript associated with a WAV file, if available.
+    For testing and WER/CER calculation purposes.
+    Is not used in main pipeline.
+    '''
     # Try several locations for transcripts:
     # 1) same directory as wav (basename.txt)
     # 2) parent 'transcript' directory (e.g., samples/ASI/transcript)
@@ -39,6 +44,9 @@ def read_transcript(wav_path: Path):
     return None
 
 def wer(ref: str, hyp: str) -> float:
+    '''
+    Word error rate (simple)
+    Is not used in main pipeline.'''
     # simple word-level WER using Levenshtein
     r = ref.split()
     h = hyp.split()
@@ -61,6 +69,9 @@ def wer(ref: str, hyp: str) -> float:
     return float(d[len(r)][len(h)]) / float(len(r))
 
 def cer(ref: str, hyp: str) -> float:
+    '''
+    Character error rate (simple)
+    Is not used in main pipeline.'''
     # character error rate (simple)
     r = list(ref.replace(" ", ""))
     h = list(hyp.replace(" ", ""))
@@ -83,6 +94,10 @@ def cer(ref: str, hyp: str) -> float:
 
 
 def record_audio(file_path: str, time_seconds: int):
+    '''
+    Record audio from the microphone and save to a WAV file.
+    Is not used in main pipeline.
+    '''
     # Settings
     duration = time_seconds  # seconds
     sample_rate = 16000  # 16 kHz, good for speech
@@ -96,7 +111,9 @@ def record_audio(file_path: str, time_seconds: int):
     write(file_path, sample_rate, audio)
 
 def play_audio(file_path: str):
-
+    '''
+    Play audio from a WAV file.
+    Is not used in main pipeline.'''
     # Load and play
     sample_rate, data = read(file_path)
     print("🎧 Playing...")

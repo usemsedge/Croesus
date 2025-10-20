@@ -51,29 +51,6 @@ def process_audio():
         "ai_response": "AI's text response"
     }
     """
-    # Get session_id from form data
-    session_id = request.form.get('session_id')
-    
-    if not session_id:
-        return jsonify({"error": "session_id is required"}), 400
-    
-    try:
-        session_id = int(session_id)
-    except ValueError:
-        return jsonify({"error": "session_id must be a number"}), 400
-    
-    # Check if session exists
-    if session_id not in sessions:
-        return jsonify({"error": "Invalid session_id"}), 404
-    
-    # Get audio file
-    if 'audio' not in request.files:
-        return jsonify({"error": "audio file is required"}), 400
-    
-    audio_file = request.files['audio']
-    
-    if audio_file.filename == '':
-        return jsonify({"error": "No audio file selected"}), 400
     
     # TODO: Process audio file
     # 1. Save audio temporarily

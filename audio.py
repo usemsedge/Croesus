@@ -1,9 +1,7 @@
 
 from pyexpat import model
 import pyttsx3
-from transformers import AutoModelForAudioClassification, WhisperFeatureExtractor
 import os
-import time
 from specialized_models import create_model, transcribe_with_fallback, \
   SPECIALIZED_MODELS
 import google.generativeai as genai
@@ -52,7 +50,7 @@ def get_text_from_speech(input_wav_file_path: str, attributes: dict) -> str:
 
   return text
 
-def get_llm_response(text: str, attributes: dict) -> str:
+def get_llm_response(text: str, attributes: dict, context: str="") -> str:
   '''
   Given transcribed text and a dictionary of attributes, 
   return a response from a large language model (LLM) with context.
@@ -70,15 +68,15 @@ def get_llm_response(text: str, attributes: dict) -> str:
 
   prompt = f"""
   The following text is pulled from an audio file which
-  comes from a phone call from a person with the 
-  following attributes: {attributes}. 
+  comes from a person with the following attributes: 
+  {attributes}. 
 
-  If the text is phrased like a question, 
-  answer the question in 30-50 words. If the question
-  concerns things you don't know, say you don't know.
-  Example: Where is my package I ordered yesterday? I don't know.
+  Context: {context}
 
   Text: {text}
+
+  Generate a concise and relevant response based on the text, 
+  context, and attributes. Keep it below 100 words.
   """
   response = model.generate_content(prompt)
   return response.text

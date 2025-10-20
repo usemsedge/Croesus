@@ -1,3 +1,5 @@
+# Problem Statement
+
 Named after Croesus, who heard a prophecy that "he would destroy a great kingdom", but instead of destroying his enemy Persia, destroyed his own empire.
 We will not be making the same mistake. We will attempt to make ambiguous messages more clear.
 
@@ -14,7 +16,7 @@ Solutions:
 
 Croesus will help out voice recognition AIs on phone/online calls with clients.
 
-# Core functionality
+# Core backend functionality
 - Input: .wav file
 - Model Layer 1: gets input accent, redirects to Layer 2 if confident enough
 - Model Layer 2: accent-specific model which parses the voice
@@ -27,6 +29,8 @@ Croesus will help out voice recognition AIs on phone/online calls with clients.
 - POST /api/audio/process: Provide audio to the server - server returns a response. Requires a valid session id.
 
 # General file structure:
+app.py: flask web app
+
 audio.py: One function for each of the four layers.
 specialized_accent_classifier: Function to get accent (or other attributes) from speech.
 specialized_models.py: Functions to use a specific model to get text from speech.
@@ -40,3 +44,6 @@ DYLD_LIBRARY_PATH="/opt/homebrew/opt/ffmpeg@7/lib:/opt/homebrew/lib:$(pwd)/.venv
 # activate venv
 source .venv/bin/activate
 
+# .env file requirements
+huggingface_token=
+google_api_key=
